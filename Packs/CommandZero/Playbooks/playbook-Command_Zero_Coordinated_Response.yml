@@ -1,0 +1,734 @@
+id: Command Zero - Coordinated Response
+version: -1
+name: Command Zero - Coordinated Response
+description: |-
+  Template for end-to-end containment across Command Zero and your own stack.
+
+  Submits an alert, waits for the verdict, executes a native Command Zero
+  response action on a qualifying verdict, then hands off to your own
+  containment tasks — ticketing, on-call notification, network-layer response.
+  A single War Room note records the verdict, the Command Zero action, and
+  everything your stack did.
+
+  HOW TO USE THIS PLAYBOOK
+
+  1. Make a copy. This ships as a template and is overwritten on pack upgrade.
+  2. Find the task named "ADD YOUR CONTAINMENT TASKS HERE" and insert your own
+     tasks or sub-playbook after it.
+  3. Have those tasks write their outcomes to the context key
+     "ThirdPartyActions" as a JSON array. Each entry may contain system,
+     action, target, status, and reference. For example:
+     [{"system":"ServiceNow","action":"Incident raised",
+       "target":"user@company.com","status":"completed",
+       "reference":"INC0012345"}]
+  4. Anything in ThirdPartyActions appears in the final note. If you set
+     nothing, the note simply omits that section.
+
+  If you already have your own orchestration, you do not need this playbook —
+  call "Command Zero - Investigate and Respond" as a sub-playbook instead and
+  post the note yourself with cmdzero-investigation-note.
+
+  This playbook does not modify incident, alert, or investigation fields.
+starttaskid: "0"
+tasks:
+  "0":
+    id: "0"
+    taskid: 4e5f6a70-0000-4000-a000-000000000000
+    type: start
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000000
+      version: -1
+      name: ""
+      iscommand: false
+      brand: ""
+      description: ''
+    nexttasks:
+      '#none#':
+        - "1"
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 50
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "1":
+    id: "1"
+    taskid: 4e5f6a70-0000-4000-a000-000000000001
+    type: regular
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000001
+      version: -1
+      name: Submit alert for investigation
+      description: Creates a Command Zero investigation from the supplied alert data.
+      script: CommandZero|||cmdzero-investigation-create
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "2"
+    scriptarguments:
+      alert_data:
+        complex:
+          root: inputs.AlertData
+      alert_schema:
+        complex:
+          root: inputs.AlertSchema
+      alert_type:
+        complex:
+          root: inputs.AlertType
+      description:
+        complex:
+          root: inputs.Description
+      template_id:
+        complex:
+          root: inputs.TemplateId
+      leads:
+        complex:
+          root: inputs.Leads
+      title:
+        complex:
+          root: inputs.Title
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 195
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "2":
+    id: "2"
+    taskid: 4e5f6a70-0000-4000-a000-000000000002
+    type: regular
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000002
+      version: -1
+      name: Wait for verdict
+      description: |-
+        Polls Command Zero until the investigation reaches a verdict. The note
+        is suppressed here so a single combined note can be posted at the end,
+        covering the verdict and every containment action.
+      script: CommandZero|||cmdzero-investigation-results
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "3"
+    scriptarguments:
+      investigation_id:
+        complex:
+          root: CommandZero.Investigation
+          accessor: id
+      interval_in_seconds:
+        complex:
+          root: inputs.PollingInterval
+      timeout_in_seconds:
+        complex:
+          root: inputs.PollingTimeout
+      post_note:
+        simple: "false"
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 370
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "3":
+    id: "3"
+    taskid: 4e5f6a70-0000-4000-a000-000000000003
+    type: condition
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000003
+      version: -1
+      name: Does the verdict qualify for containment?
+      description: |-
+        Checks the verdict labels against the ActionableVerdict input. Command
+        Zero returns verdict as an array of labels, so this is a membership
+        test, not an equality test.
+      type: condition
+      iscommand: false
+      brand: ""
+    nexttasks:
+      '#default#':
+        - "8"
+      "Contain":
+        - "4"
+    separatecontext: false
+    conditions:
+      - label: "Contain"
+        condition:
+          - - operator: containsGeneral
+              left:
+                value:
+                  complex:
+                    root: CommandZero.Investigation
+                    accessor: verdict
+                iscontext: true
+              right:
+                value:
+                  complex:
+                    root: inputs.ActionableVerdict
+                iscontext: true
+              ignorecase: true
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 545
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "4":
+    id: "4"
+    taskid: 4e5f6a70-0000-4000-a000-000000000004
+    type: condition
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000004
+      version: -1
+      name: Is a Command Zero response action configured?
+      description: |-
+        Skips the native action when no remediation template was supplied, so
+        the playbook can be used for stack-only containment.
+      type: condition
+      iscommand: false
+      brand: ""
+    nexttasks:
+      '#default#':
+        - "6"
+      "Yes":
+        - "5"
+    separatecontext: false
+    conditions:
+      - label: "Yes"
+        condition:
+          - - operator: isNotEmpty
+              left:
+                value:
+                  complex:
+                    root: inputs.RemediationTemplateId
+                iscontext: true
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 240,
+          "y": 720
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "5":
+    id: "5"
+    taskid: 4e5f6a70-0000-4000-a000-000000000005
+    type: regular
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000005
+      version: -1
+      name: Execute native Command Zero response action
+      description: |-
+        Command Zero enforces governance server-side. A blocked or conflicting
+        action is returned as a result and reported in the note; harder
+        failures are allowed to continue so the note is still posted.
+      script: CommandZero|||cmdzero-remediation-create
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "10"
+    scriptarguments:
+      template_id:
+        complex:
+          root: inputs.RemediationTemplateId
+      subject_type:
+        complex:
+          root: inputs.RemediationSubjectType
+      subject_value:
+        complex:
+          root: inputs.RemediationSubjectValue
+      justification:
+        complex:
+          root: inputs.RemediationJustification
+    reputationcalc: 0
+    separatecontext: false
+    continueonerror: true
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 50,
+          "y": 895
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "10":
+    id: "10"
+    taskid: 4e5f6a70-0000-4000-a000-000000000010
+    type: condition
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000010
+      version: -1
+      name: Was a remediation created?
+      description: |-
+        A blocked or conflicting action returns no remediation ID, so there is
+        nothing to wait for. Carry on to your containment tasks; the note
+        reports why the native action did not run.
+      type: condition
+      iscommand: false
+      brand: ""
+    nexttasks:
+      '#default#':
+        - "6"
+      "Yes":
+        - "11"
+    separatecontext: false
+    conditions:
+      - label: "Yes"
+        condition:
+          - - operator: isNotEmpty
+              left:
+                value:
+                  complex:
+                    root: CommandZero.Remediation
+                    accessor: id
+                iscontext: true
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 50,
+          "y": 1070
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "11":
+    id: "11"
+    taskid: 4e5f6a70-0000-4000-a000-000000000011
+    type: regular
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000011
+      version: -1
+      name: Wait for the Command Zero action to finish
+      description: |-
+        Remediations are queued on creation, so the create call returns a
+        pending status. Waiting here means the final note reports the real
+        outcome. Most remediations finish within a minute.
+      script: CommandZero|||cmdzero-remediation-results
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "6"
+    scriptarguments:
+      remediation_id:
+        complex:
+          root: CommandZero.Remediation
+          accessor: id
+    reputationcalc: 0
+    separatecontext: false
+    # A remediation that outlives the timeout should not stop containment or
+    # suppress the note; the last known status is reported instead.
+    continueonerror: true
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 50,
+          "y": 1245
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "6":
+    id: "6"
+    taskid: 4e5f6a70-0000-4000-a000-000000000006
+    type: title
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000006
+      version: -1
+      name: ADD YOUR CONTAINMENT TASKS HERE
+      type: title
+      iscommand: false
+      brand: ""
+      description: |-
+        Insert your own containment tasks or sub-playbook after this marker —
+        ticketing, on-call notification, network-layer response.
+
+        Have them write their outcomes to the context key "ThirdPartyActions"
+        as a JSON array of objects with system, action, target, status and
+        reference. Whatever is there when the next task runs is included in the
+        War Room note. Leave it unset and the note omits that section.
+    nexttasks:
+      '#none#':
+        - "7"
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 240,
+          "y": 1420
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "7":
+    id: "7"
+    taskid: 4e5f6a70-0000-4000-a000-000000000007
+    type: regular
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000007
+      version: -1
+      name: Post combined containment summary
+      description: |-
+        Writes one War Room note covering the verdict, the Command Zero action,
+        and every containment step your stack took.
+      script: CommandZero|||cmdzero-investigation-note
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "9"
+    scriptarguments:
+      investigation_id:
+        complex:
+          root: CommandZero.Investigation
+          accessor: id
+      response_action_outcome:
+        complex:
+          root: CommandZero.Remediation
+          accessor: governanceOutcome
+      response_action_type:
+        complex:
+          root: CommandZero.Remediation
+          accessor: templateName
+      response_action_id:
+        complex:
+          root: CommandZero.Remediation
+          accessor: id
+      response_action_status:
+        complex:
+          root: CommandZero.Remediation
+          accessor: status
+      response_action_reason:
+        complex:
+          root: CommandZero.Remediation
+          accessor: governanceReason
+      rollback_template_id:
+        complex:
+          root: CommandZero.Remediation
+          accessor: undoTemplateId
+      third_party_actions:
+        complex:
+          root: ThirdPartyActions
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 240,
+          "y": 1595
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "8":
+    id: "8"
+    taskid: 4e5f6a70-0000-4000-a000-000000000008
+    type: regular
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000008
+      version: -1
+      name: Post verdict only
+      description: |-
+        The verdict did not qualify for containment. The note records the
+        verdict and states explicitly that no response action was requested.
+      script: CommandZero|||cmdzero-investigation-note
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "9"
+    scriptarguments:
+      investigation_id:
+        complex:
+          root: CommandZero.Investigation
+          accessor: id
+      response_disposition:
+        simple: not-qualifying
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 690,
+          "y": 720
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "9":
+    id: "9"
+    taskid: 4e5f6a70-0000-4000-a000-000000000009
+    type: title
+    task:
+      id: 4e5f6a70-0000-4000-a000-000000000009
+      version: -1
+      name: Done
+      type: title
+      iscommand: false
+      brand: ""
+      description: ''
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 1770
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+view: |-
+  {
+    "linkLabelsPosition": {
+      "3_4_Contain": 0.4,
+      "3_8_#default#": 0.4,
+      "4_5_Yes": 0.4,
+      "4_6_#default#": 0.4,
+      "10_11_Yes": 0.4,
+      "10_6_#default#": 0.4
+    },
+    "paper": {
+      "dimensions": {
+        "height": 1785,
+        "width": 1030,
+        "x": 50,
+        "y": 50
+      }
+    }
+  }
+inputs:
+  - key: AlertData
+    value: {}
+    required: false
+    description: |-
+      The Command Zero alert: a JSON object holding the detection you want
+      investigated. This is not the Cortex case the playbook is running on —
+      nothing is read from it automatically, so map in whatever you want
+      submitted.
+
+      Where the case came from a fetching integration, the incident's rawJSON
+      usually holds the original untouched payload, which is the case where
+      AlertSchema can name a catalog type. Anything Cortex has mapped, or that
+      a playbook assembled, is reshaped and needs annotations instead.
+
+      Required unless TemplateId is supplied.
+    playbookInputQuery: null
+  - key: AlertSchema
+    value: {}
+    required: false
+    description: |-
+      Either a JSON array of path/type annotations describing where the values
+      are in your own data, or a known catalog type string.
+
+      Use a catalog type only when the payload still matches that entry's
+      expected shape. If the alert has been reshaped on its way into Cortex,
+      supply annotations instead.
+    playbookInputQuery: null
+  - key: AlertType
+    value: {}
+    required: false
+    description: |-
+      The kind of alert this is, for example EmailMalwareDetected. Required
+      when AlertSchema is omitted, and when AlertSchema is a JSON array of
+      annotations. Must NOT be set when AlertSchema is a catalog type string.
+    playbookInputQuery: null
+  - key: Description
+    value: {}
+    required: false
+    description: |-
+      Detailed description of the investigation. Required when submitting
+      AlertType and AlertData without an AlertSchema.
+    playbookInputQuery: null
+  - key: TemplateId
+    value: {}
+    required: false
+    description: |-
+      Investigation template ID, for template-based investigations. Use instead
+      of AlertData and AlertSchema.
+    playbookInputQuery: null
+  - key: Leads
+    value: {}
+    required: false
+    description: JSON array of lead objects when using TemplateId.
+    playbookInputQuery: null
+  - key: Title
+    value: {}
+    required: false
+    description: Optional title override for the investigation.
+    playbookInputQuery: null
+  - key: ActionableVerdict
+    value:
+      simple: Malicious
+    required: false
+    description: |-
+      The verdict label that qualifies the investigation for containment.
+      Command Zero returns verdict as an array of labels; containment runs when
+      this value appears among them.
+    playbookInputQuery: null
+  - key: RemediationTemplateId
+    value: {}
+    required: false
+    description: |-
+      Remediation template for the native Command Zero action. Use
+      cmdzero-remediation-template-list to find available templates. Leave
+      empty to run your own containment tasks without a native action.
+    playbookInputQuery: null
+  - key: RemediationSubjectType
+    value: {}
+    required: false
+    description: |-
+      Subject type for the native action, matching the template's subjectType.
+    playbookInputQuery: null
+  - key: RemediationSubjectValue
+    value: {}
+    required: false
+    description: The target of the native action.
+    playbookInputQuery: null
+  - key: RemediationJustification
+    value:
+      simple: Automated containment following a qualifying Command Zero verdict.
+    required: false
+    description: |-
+      Justification recorded in the Command Zero audit trail for the native
+      action.
+    playbookInputQuery: null
+  - key: PollingInterval
+    value:
+      simple: "60"
+    required: false
+    description: Seconds between polls while waiting for the verdict.
+    playbookInputQuery: null
+  - key: PollingTimeout
+    value:
+      simple: "3600"
+    required: false
+    description: Seconds to wait for a verdict before giving up.
+    playbookInputQuery: null
+outputs:
+  - contextPath: CommandZero.Investigation.id
+    description: Investigation unique identifier.
+    type: string
+  - contextPath: CommandZero.Investigation.verdict
+    description: Verdict labels assigned by Command Zero.
+    type: unknown
+  - contextPath: CommandZero.Investigation.severity
+    description: Investigation severity.
+    type: string
+  - contextPath: CommandZero.Investigation.confidenceLevel
+    description: Confidence in the investigation findings.
+    type: string
+  - contextPath: CommandZero.Investigation.consoleUrl
+    description: Direct link to the investigation in the Command Zero console.
+    type: string
+  - contextPath: CommandZero.Remediation.governanceOutcome
+    description: Whether the native action was executed, blocked, or conflicted.
+    type: string
+  - contextPath: ThirdPartyActions
+    description: |-
+      Containment actions taken in your own stack, as populated by the tasks
+      you insert. Included in the War Room note.
+    type: unknown
+tests:
+  - Command Zero - Test
+fromversion: 6.10.0
+marketplaces:
+  - xsoar

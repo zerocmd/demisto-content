@@ -1,0 +1,388 @@
+id: Command Zero - Investigate Alert
+version: -1
+name: Command Zero - Investigate Alert
+description: |-
+  Submits an alert to Command Zero for automated investigation, waits for the
+  verdict, and writes the full investigation summary to the War Room as a note.
+
+  No response action is requested by this playbook, and no
+  incident, alert, or investigation fields are modified. Use
+  "Command Zero - Investigate and Respond" when a native response action should
+  follow a qualifying verdict.
+starttaskid: "0"
+tasks:
+  "0":
+    id: "0"
+    taskid: 6f1a0c80-0000-4000-a000-000000000000
+    type: start
+    task:
+      id: 6f1a0c80-0000-4000-a000-000000000000
+      version: -1
+      name: ""
+      iscommand: false
+      brand: ""
+      description: ''
+    nexttasks:
+      '#none#':
+        - "1"
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 50
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "1":
+    id: "1"
+    taskid: 6f1a0c80-0000-4000-a000-000000000001
+    type: regular
+    task:
+      id: 6f1a0c80-0000-4000-a000-000000000001
+      version: -1
+      name: Submit alert for investigation
+      description: |-
+        Creates a Command Zero investigation from the supplied alert data.
+        Command Zero may merge the alert into an existing investigation; the
+        action output records which happened.
+      script: CommandZero|||cmdzero-investigation-create
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "2"
+    scriptarguments:
+      alert_data:
+        complex:
+          root: inputs.AlertData
+      alert_schema:
+        complex:
+          root: inputs.AlertSchema
+      alert_type:
+        complex:
+          root: inputs.AlertType
+      description:
+        complex:
+          root: inputs.Description
+      template_id:
+        complex:
+          root: inputs.TemplateId
+      leads:
+        complex:
+          root: inputs.Leads
+      title:
+        complex:
+          root: inputs.Title
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 195
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "2":
+    id: "2"
+    taskid: 6f1a0c80-0000-4000-a000-000000000002
+    type: regular
+    task:
+      id: 6f1a0c80-0000-4000-a000-000000000002
+      version: -1
+      name: Wait for verdict
+      description: |-
+        Polls Command Zero until the investigation reaches a verdict. The note
+        is posted later, once any existing Command Zero actions on this
+        investigation have been looked up.
+      script: CommandZero|||cmdzero-investigation-results
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "4"
+    scriptarguments:
+      investigation_id:
+        complex:
+          root: CommandZero.Investigation
+          accessor: id
+      interval_in_seconds:
+        complex:
+          root: inputs.PollingInterval
+      timeout_in_seconds:
+        complex:
+          root: inputs.PollingTimeout
+      post_note:
+        simple: "false"
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 370
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "4":
+    id: "4"
+    taskid: 6f1a0c80-0000-4000-a000-000000000004
+    type: regular
+    task:
+      id: 6f1a0c80-0000-4000-a000-000000000004
+      version: -1
+      name: Look for existing Command Zero actions
+      description: |-
+        Reports whether anyone has already acted on this investigation. The
+        Command Zero API gives a remediation no investigation reference, so this
+        correlates on the marker that cmdzero-remediation-create writes into the
+        justification — actions raised directly in the console will not be
+        found.
+      script: CommandZero|||cmdzero-remediation-list
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "5"
+    scriptarguments:
+      investigation_id:
+        complex:
+          root: CommandZero.Investigation
+          accessor: id
+    reputationcalc: 0
+    separatecontext: false
+    # Context for the note, not the point of the playbook. A lookup failure
+    # must not cost the analyst the verdict.
+    continueonerror: true
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 545
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "5":
+    id: "5"
+    taskid: 6f1a0c80-0000-4000-a000-000000000005
+    type: regular
+    task:
+      id: 6f1a0c80-0000-4000-a000-000000000005
+      version: -1
+      name: Post the investigation summary
+      description: |-
+        Writes the verdict and findings to the War Room, stating explicitly that
+        this playbook requested no response action, and listing any Command Zero
+        actions already recorded against the investigation.
+      script: CommandZero|||cmdzero-investigation-note
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "3"
+    scriptarguments:
+      investigation_id:
+        complex:
+          root: CommandZero.Investigation
+          accessor: id
+      response_disposition:
+        simple: investigate-only
+      related_remediations:
+        complex:
+          root: CommandZero.Remediation
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 720
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "3":
+    id: "3"
+    taskid: 6f1a0c80-0000-4000-a000-000000000003
+    type: title
+    task:
+      id: 6f1a0c80-0000-4000-a000-000000000003
+      version: -1
+      name: Done
+      type: title
+      iscommand: false
+      brand: ""
+      description: ''
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 895
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+view: |-
+  {
+    "linkLabelsPosition": {},
+    "paper": {
+      "dimensions": {
+        "height": 910,
+        "width": 380,
+        "x": 450,
+        "y": 50
+      }
+    }
+  }
+inputs:
+  - key: AlertData
+    value: {}
+    required: false
+    description: |-
+      The Command Zero alert: a JSON object holding the detection you want
+      investigated. This is not the Cortex case the playbook is running on —
+      nothing is read from it automatically, so map in whatever you want
+      submitted.
+
+      Where the case came from a fetching integration, the incident's rawJSON
+      usually holds the original untouched payload, which is the case where
+      AlertSchema can name a catalog type. Anything Cortex has mapped, or that
+      a playbook assembled, is reshaped and needs annotations instead.
+
+      Required unless TemplateId is supplied.
+    playbookInputQuery: null
+  - key: AlertSchema
+    value: {}
+    required: false
+    description: |-
+      Either a JSON array of path/type annotations describing where the values
+      are in your own data, or a known catalog type string such as
+      RECORDED_FUTURE_PLAYBOOK_ALERT.
+
+      Use a catalog type only when the payload still matches that entry's
+      expected shape. If the alert has been reshaped on its way into Cortex —
+      by a classifier, a mapper, or a playbook — supply annotations instead, so
+      Command Zero is told where the values actually are.
+    playbookInputQuery: null
+  - key: AlertType
+    value: {}
+    required: false
+    description: |-
+      The kind of alert this is, for example EmailMalwareDetected. Required
+      when AlertSchema is omitted, and when AlertSchema is a JSON array of
+      annotations. Must NOT be set when AlertSchema is a catalog type string.
+    playbookInputQuery: null
+  - key: Description
+    value: {}
+    required: false
+    description: |-
+      Detailed description of the investigation. Required when submitting
+      AlertType and AlertData without an AlertSchema.
+    playbookInputQuery: null
+  - key: TemplateId
+    value: {}
+    required: false
+    description: |-
+      Investigation template ID, for template-based investigations. Use instead
+      of AlertData and AlertSchema.
+    playbookInputQuery: null
+  - key: Leads
+    value: {}
+    required: false
+    description: |-
+      JSON array of lead objects when using TemplateId. For example
+      [{"type":"EMAIL_ADDRESS","value":"user@company.com"}].
+    playbookInputQuery: null
+  - key: Title
+    value: {}
+    required: false
+    description: Optional title override for the investigation.
+    playbookInputQuery: null
+  - key: PollingInterval
+    value:
+      simple: "60"
+    required: false
+    description: Seconds between polls while waiting for the verdict.
+    playbookInputQuery: null
+  - key: PollingTimeout
+    value:
+      simple: "3600"
+    required: false
+    description: Seconds to wait for a verdict before giving up.
+    playbookInputQuery: null
+outputs:
+  - contextPath: CommandZero.Investigation.id
+    description: Investigation unique identifier.
+    type: string
+  - contextPath: CommandZero.Investigation.action
+    description: Whether the alert created a new investigation or merged into one.
+    type: string
+  - contextPath: CommandZero.Investigation.verdict
+    description: Verdict labels assigned by Command Zero.
+    type: unknown
+  - contextPath: CommandZero.Investigation.severity
+    description: Investigation severity.
+    type: string
+  - contextPath: CommandZero.Investigation.confidenceLevel
+    description: Confidence in the investigation findings.
+    type: string
+  - contextPath: CommandZero.Investigation.status
+    description: Investigation status.
+    type: string
+  - contextPath: CommandZero.Investigation.summary
+    description: Markdown findings summary.
+    type: string
+  - contextPath: CommandZero.Investigation.consoleUrl
+    description: Direct link to the investigation in the Command Zero console.
+    type: string
+tests:
+  - Command Zero - Test
+fromversion: 6.10.0
+marketplaces:
+  - xsoar

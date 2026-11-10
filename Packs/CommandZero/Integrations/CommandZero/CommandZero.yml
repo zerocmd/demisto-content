@@ -1,0 +1,1129 @@
+name: CommandZero
+display: Command Zero
+description: >-
+  Submit alerts to Command Zero for automated investigation, wait for a verdict,
+  and write the findings to the War Room. Execute native Command Zero response
+  actions under server-side governance.
+  Targets Command Zero public API schema version 2026-03-12.
+commonfields:
+  id: CommandZero
+  version: -1
+category: Data Enrichment & Threat Intelligence
+
+configuration:
+- display: API Key
+  name: api_key
+  type: 4
+  required: true
+  section: Connect
+  additionalinfo: >-
+    Your Command Zero API key, issued to an application with the Application
+    role. Starts with "c0.".
+
+- display: Organization ID
+  name: organization_id
+  type: 0
+  required: true
+  section: Connect
+  additionalinfo: >-
+    The UUID of the Command Zero organization this instance works against.
+    Find it in the Command Zero console, shown alongside the API key.
+    An API key may have access to more than one organization, so this must
+    name the one you intend to use. The Test button verifies the key can
+    reach it.
+
+- display: Base URL
+  name: base_url
+  type: 0
+  required: false
+  defaultvalue: https://api.cmdzero.io/public/v1
+  section: Connect
+  additionalinfo: "Use the default unless directed otherwise."
+
+- display: Trust any certificate (not secure)
+  name: insecure
+  type: 8
+  required: false
+  section: Connect
+
+- display: Use system proxy settings
+  name: proxy
+  type: 8
+  required: false
+  section: Connect
+
+script:
+  type: python
+  subtype: python3
+  dockerimage: demisto/python3:3.12.15.14069087
+  script: '-'
+  isfetch: false
+  commands:
+  - name: cmdzero-organization-list
+    description: List organizations accessible to this API key.
+    arguments:
+    - name: limit
+      description: Maximum number of items to return (1-10000).
+      required: false
+      defaultValue: "50"
+    - name: filter
+      description: >-
+        OData-style filter expression to narrow results.
+        Supported fields are createdTime, name, role, updatedTime,
+        createdBy/type, createdBy/id, createdBy/name, updatedBy/type,
+        updatedBy/id, and updatedBy/name. Note that id is not filterable.
+      required: false
+    - name: next_token
+      description: Pagination cursor from a previous response.
+      required: false
+    outputs:
+    - contextPath: CommandZero.Organization.id
+      description: Organization unique identifier.
+      type: String
+    - contextPath: CommandZero.Organization.name
+      description: Organization display name.
+      type: String
+    - contextPath: CommandZero.Organization.role
+      description: Application role in this organization.
+      type: String
+    - contextPath: CommandZero.Organization.createdTime
+      description: When the organization was created.
+      type: String
+    - contextPath: CommandZero.Organization.updatedTime
+      description: When the organization was last updated.
+      type: String
+    - contextPath: CommandZero.OrganizationNextToken
+      description: Pagination cursor for the next page of results.
+      type: String
+
+  - name: cmdzero-investigation-list
+    description: List investigations in the organization.
+    arguments:
+    - name: limit
+      description: Maximum number of results to return.
+      required: false
+      defaultValue: "50"
+    - name: filter
+      description: "OData filter expression (e.g. \"status eq 'open'\")."
+      required: false
+    - name: next_token
+      description: Pagination cursor from a previous response.
+      required: false
+    outputs:
+    - contextPath: CommandZero.Investigation.id
+      description: Investigation unique identifier.
+      type: String
+    - contextPath: CommandZero.Investigation.title
+      description: Investigation title.
+      type: String
+    - contextPath: CommandZero.Investigation.status
+      description: Investigation status.
+      type: String
+    - contextPath: CommandZero.Investigation.severity
+      description: Investigation severity.
+      type: String
+    - contextPath: CommandZero.Investigation.category
+      description: Investigation category.
+      type: String
+    - contextPath: CommandZero.Investigation.completed
+      description: True when verdict is ready.
+      type: Boolean
+    - contextPath: CommandZero.Investigation.verdict
+      description: Verdict labels.
+      type: Unknown
+    - contextPath: CommandZero.Investigation.consoleUrl
+      description: Direct link to the investigation in the console.
+      type: String
+    - contextPath: CommandZero.Investigation.createdTime
+      description: When the investigation was created.
+      type: String
+    - contextPath: CommandZero.InvestigationNextToken
+      description: Pagination cursor for the next page of results.
+      type: String
+
+  - name: cmdzero-investigation-get
+    description: Retrieve a specific investigation by ID.
+    arguments:
+    - name: investigation_id
+      description: The investigation UUID to retrieve.
+      required: true
+    outputs:
+    - contextPath: CommandZero.Investigation.id
+      description: Investigation unique identifier.
+      type: String
+    - contextPath: CommandZero.Investigation.title
+      description: Investigation title.
+      type: String
+    - contextPath: CommandZero.Investigation.status
+      description: Investigation status.
+      type: String
+    - contextPath: CommandZero.Investigation.severity
+      description: Investigation severity.
+      type: String
+    - contextPath: CommandZero.Investigation.category
+      description: Investigation category.
+      type: String
+    - contextPath: CommandZero.Investigation.completed
+      description: True when verdict is ready.
+      type: Boolean
+    - contextPath: CommandZero.Investigation.verdict
+      description: Verdict labels.
+      type: Unknown
+    - contextPath: CommandZero.Investigation.summary
+      description: Markdown findings summary.
+      type: String
+    - contextPath: CommandZero.Investigation.description
+      description: Investigation description.
+      type: String
+    - contextPath: CommandZero.Investigation.startTime
+      description: Start of the investigation time window.
+      type: String
+    - contextPath: CommandZero.Investigation.endTime
+      description: End of the investigation time window.
+      type: String
+    - contextPath: CommandZero.Investigation.impact
+      description: Assessed impact of the threat.
+      type: String
+    - contextPath: CommandZero.Investigation.confidenceLevel
+      description: Confidence in the investigation findings.
+      type: String
+    - contextPath: CommandZero.Investigation.observables
+      description: Observables discovered during investigation.
+      type: Unknown
+    - contextPath: CommandZero.Investigation.consoleUrl
+      description: Direct link to the investigation in the console.
+      type: String
+    - contextPath: CommandZero.Investigation.createdTime
+      description: When the investigation was created.
+      type: String
+    - contextPath: CommandZero.Investigation.updatedTime
+      description: When the investigation was last updated.
+      type: String
+  - name: cmdzero-investigation-results
+    description: >-
+      Wait for a Command Zero investigation to reach a verdict, then write the
+      outcome to the War Room as a note.
+      This command polls and does not return until the investigation
+      completes, fails, or the timeout elapses.
+      It does not modify incident, alert, or investigation fields.
+    polling: true
+    arguments:
+    - name: investigation_id
+      description: The investigation UUID to wait on.
+      required: true
+    - name: interval_in_seconds
+      description: Seconds between polls.
+      required: false
+      defaultValue: "60"
+    - name: timeout_in_seconds
+      description: Seconds before polling gives up.
+      required: false
+      defaultValue: "3600"
+    - name: post_note
+      description: >-
+        Whether to write the investigation summary to the War Room as a note
+        on completion. Set to false when a later
+        cmdzero-investigation-note call will post a combined note
+        that also covers the response action.
+      required: false
+      auto: PREDEFINED
+      predefined:
+      - "true"
+      - "false"
+      defaultValue: "true"
+    - name: third_party_actions
+      description: >-
+        JSON array of response actions taken in your own stack, so the note
+        covers the whole containment picture. Each entry may contain system,
+        action, target, status, and reference. Example -
+        [{"system":"ServiceNow","action":"Incident raised",
+        "target":"user@company.com","status":"completed","reference":"INC0012345"}].
+      required: false
+    - name: response_disposition
+      description: >-
+        Why no response action was taken, when none was. Used to make the
+        note say "submitted for analysis only" rather than "the verdict did
+        not qualify" - two materially different statements. Ignored when a
+        response action is reported.
+      required: false
+      auto: PREDEFINED
+      predefined:
+      - investigate-only
+      - not-qualifying
+    - name: related_remediations
+      description: >-
+        JSON array of other Command Zero remediations already recorded
+        against this investigation, listed in the note as context. Map from
+        CommandZero.Remediation after running cmdzero-remediation-list with
+        an investigation_id.
+      required: false
+    outputs:
+    - contextPath: CommandZero.Investigation.id
+      description: Investigation unique identifier.
+      type: String
+    - contextPath: CommandZero.Investigation.status
+      description: Investigation status.
+      type: String
+    - contextPath: CommandZero.Investigation.completed
+      description: True when verdict is ready.
+      type: Boolean
+    - contextPath: CommandZero.Investigation.verdict
+      description: Verdict labels.
+      type: Unknown
+    - contextPath: CommandZero.Investigation.severity
+      description: Investigation severity.
+      type: String
+    - contextPath: CommandZero.Investigation.confidenceLevel
+      description: Confidence in the investigation findings.
+      type: String
+    - contextPath: CommandZero.Investigation.summary
+      description: Markdown findings summary.
+      type: String
+    - contextPath: CommandZero.Investigation.category
+      description: Investigation category.
+      type: String
+    - contextPath: CommandZero.Investigation.observables
+      description: Observables discovered during investigation.
+      type: Unknown
+    - contextPath: CommandZero.Investigation.consoleUrl
+      description: Direct link to the investigation in the console.
+      type: String
+    - contextPath: CommandZero.Investigation.completedTime
+      description: When the investigation completed.
+      type: String
+
+  - name: cmdzero-investigation-note
+    description: >-
+      Write a Command Zero investigation summary to the War Room as a note.
+      Optionally includes the outcome of a response action, so the verdict and
+      the action taken are recorded together.
+      It does not modify incident, alert, or investigation fields.
+    arguments:
+    - name: investigation_id
+      description: The investigation UUID to summarize.
+      required: true
+    - name: response_action_outcome
+      description: >-
+        Governance outcome of the response action.
+        Map from CommandZero.Remediation.governanceOutcome.
+      required: false
+      auto: PREDEFINED
+      predefined:
+      - executed
+      - blocked
+      - conflict
+    - name: response_action_type
+      description: >-
+        Name of the response action taken.
+        Map from CommandZero.Remediation.templateName.
+      required: false
+    - name: response_action_id
+      description: >-
+        Remediation identifier.
+        Map from CommandZero.Remediation.id.
+      required: false
+    - name: response_action_status
+      description: >-
+        Execution status of the remediation.
+        Map from CommandZero.Remediation.status.
+      required: false
+    - name: response_action_reason
+      description: >-
+        Reason the action was blocked or conflicted.
+        Map from CommandZero.Remediation.governanceReason.
+      required: false
+    - name: rollback_template_id
+      description: >-
+        Template that reverses the action.
+        Map from CommandZero.Remediation.undoTemplateId.
+      required: false
+    - name: third_party_actions
+      description: >-
+        JSON array of response actions taken in your own stack, so the note
+        covers the whole containment picture. Each entry may contain system,
+        action, target, status, and reference. Example -
+        [{"system":"ServiceNow","action":"Incident raised",
+        "target":"user@company.com","status":"completed","reference":"INC0012345"}].
+      required: false
+    - name: response_disposition
+      description: >-
+        Why no response action was taken, when none was. Used to make the
+        note say "submitted for analysis only" rather than "the verdict did
+        not qualify" - two materially different statements. Ignored when a
+        response action is reported.
+      required: false
+      auto: PREDEFINED
+      predefined:
+      - investigate-only
+      - not-qualifying
+    - name: related_remediations
+      description: >-
+        JSON array of other Command Zero remediations already recorded
+        against this investigation, listed in the note as context. Map from
+        CommandZero.Remediation after running cmdzero-remediation-list with
+        an investigation_id.
+      required: false
+    outputs:
+    - contextPath: CommandZero.Investigation.id
+      description: Investigation unique identifier.
+      type: String
+    - contextPath: CommandZero.Investigation.verdict
+      description: Verdict labels.
+      type: Unknown
+    - contextPath: CommandZero.Investigation.severity
+      description: Investigation severity.
+      type: String
+    - contextPath: CommandZero.Investigation.confidenceLevel
+      description: Confidence in the investigation findings.
+      type: String
+    - contextPath: CommandZero.Investigation.summary
+      description: Markdown findings summary.
+      type: String
+    - contextPath: CommandZero.Investigation.consoleUrl
+      description: Direct link to the investigation in the console.
+      type: String
+
+  - name: cmdzero-remediation-template-list
+    description: List available remediation templates for this organization.
+    arguments:
+    - name: limit
+      description: Maximum number of results to return.
+      required: false
+      defaultValue: "50"
+    - name: next_token
+      description: Pagination cursor from a previous response.
+      required: false
+    - name: subject_type
+      description: "Filter by subject type (e.g. MICROSOFT_ENTRA_USER_PRINCIPAL_NAME)."
+      required: false
+    outputs:
+    - contextPath: CommandZero.RemediationTemplate.id
+      description: Template unique identifier.
+      type: String
+    - contextPath: CommandZero.RemediationTemplate.name
+      description: Full template name.
+      type: String
+    - contextPath: CommandZero.RemediationTemplate.displayName
+      description: Short display name for the action.
+      type: String
+    - contextPath: CommandZero.RemediationTemplate.description
+      description: What this remediation does.
+      type: String
+    - contextPath: CommandZero.RemediationTemplate.subjectType
+      description: The subject type this template operates on.
+      type: String
+    - contextPath: CommandZero.RemediationTemplate.undoTemplateId
+      description: Template ID to reverse this action. Empty if not reversible.
+      type: String
+    - contextPath: CommandZero.RemediationTemplate.createdTime
+      description: When the template was created.
+      type: String
+    - contextPath: CommandZero.RemediationTemplateNextToken
+      description: Pagination cursor for the next page of results.
+      type: String
+  - name: cmdzero-remediation-create
+    description: >-
+      Execute a remediation action against a subject.
+      The template must match the subject type.
+      All native response actions are notify-only by default.
+    arguments:
+    - name: template_id
+      description: >-
+        Remediation template ID.
+        Use cmdzero-remediation-template-list to find available templates.
+      required: true
+    - name: subject_type
+      description: >-
+        Subject type matching the template
+        (e.g. MICROSOFT_ENTRA_USER_PRINCIPAL_NAME,
+        CROWDSTRIKE_DEVICE_ID).
+      required: true
+    - name: subject_value
+      description: >-
+        The target value
+        (e.g. user@company.com or a device ID).
+      required: true
+    - name: justification
+      description: >-
+        Reason for executing this remediation.
+        Recorded in the Command Zero audit trail.
+      required: true
+    - name: investigation_id
+      description: >-
+        The investigation this action responds to. Recorded in the
+        justification as a correlation marker, which is the only way to find
+        an action by investigation later - the API has no investigation
+        field on a remediation. Strongly recommended.
+      required: false
+    - name: postback_url
+      description: URL to receive notification when remediation completes.
+      required: false
+    - name: postback_token
+      description: Secret token for postback verification.
+      required: false
+    outputs:
+    - contextPath: CommandZero.Remediation.id
+      description: Remediation unique identifier.
+      type: String
+    - contextPath: CommandZero.Remediation.status
+      description: Remediation execution status.
+      type: String
+    - contextPath: CommandZero.Remediation.templateId
+      description: The template ID used.
+      type: String
+    - contextPath: CommandZero.Remediation.templateName
+      description: The template name at time of execution.
+      type: String
+    - contextPath: CommandZero.Remediation.subject
+      description: The target subject of the remediation.
+      type: Unknown
+    - contextPath: CommandZero.Remediation.justification
+      description: Justification provided when created.
+      type: String
+    - contextPath: CommandZero.Remediation.error
+      description: Error message if failed. Empty if no error.
+      type: String
+    - contextPath: CommandZero.Remediation.governanceOutcome
+      description: >-
+        Outcome of the server-side governance evaluation.
+        One of executed, blocked, or conflict.
+      type: String
+    - contextPath: CommandZero.Remediation.governanceHttpStatus
+      description: >-
+        HTTP status returned when governance declined the action.
+        403 for a policy block, 409 for a conflict. Absent when executed.
+      type: Number
+    - contextPath: CommandZero.Remediation.governanceReason
+      description: >-
+        Reason the action was blocked or conflicted.
+        Absent when executed.
+      type: String
+    - contextPath: CommandZero.Remediation.traceId
+      description: >-
+        Command Zero trace ID for the declined request.
+        Quote this in support requests.
+      type: String
+    - contextPath: CommandZero.Remediation.rollbackAvailable
+      description: True when this remediation can be reversed.
+      type: Boolean
+    - contextPath: CommandZero.Remediation.undoTemplateId
+      description: >-
+        Template ID that reverses this remediation.
+        Empty when the action is not reversible.
+      type: String
+    - contextPath: CommandZero.Remediation.organizationId
+      description: Organization that owns this remediation.
+      type: String
+    - contextPath: CommandZero.Remediation.createdTime
+      description: When the remediation was created.
+      type: String
+    - contextPath: CommandZero.Remediation.updatedTime
+      description: When the remediation was last updated.
+      type: String
+  - name: cmdzero-remediation-results
+    description: >-
+      Wait for a Command Zero remediation to finish and report its outcome.
+      Remediations are queued on creation, so cmdzero-remediation-create
+      usually returns a pending status. Use this to wait for the real result.
+      Most remediations complete within a minute.
+    polling: true
+    arguments:
+    - name: remediation_id
+      description: >-
+        The remediation ID to wait on.
+        Map from CommandZero.Remediation.id.
+      required: true
+    - name: interval_in_seconds
+      description: Seconds between polls.
+      required: false
+      defaultValue: "15"
+    - name: timeout_in_seconds
+      description: Seconds before polling gives up.
+      required: false
+      defaultValue: "600"
+    outputs:
+    - contextPath: CommandZero.Remediation.id
+      description: Remediation unique identifier.
+      type: String
+    - contextPath: CommandZero.Remediation.status
+      description: >-
+        Final remediation status. Known values are success, failed,
+        not_found, unchanged, and interrupted. This is an open enumeration.
+      type: String
+    - contextPath: CommandZero.Remediation.templateName
+      description: The template name at time of execution.
+      type: String
+    - contextPath: CommandZero.Remediation.subject
+      description: The target subject of the remediation.
+      type: Unknown
+    - contextPath: CommandZero.Remediation.error
+      description: Error message if failed. Empty if no error.
+      type: String
+    - contextPath: CommandZero.Remediation.result
+      description: Result of the remediation, when it succeeded.
+      type: Unknown
+    - contextPath: CommandZero.Remediation.completedTime
+      description: When the remediation completed.
+      type: String
+    - contextPath: CommandZero.Remediation.consoleUrl
+      description: Direct link to the remediation in the console.
+      type: String
+
+  - name: cmdzero-remediation-list
+    description: >-
+      List remediations in the organization. Use investigation_id to find the
+      actions recorded against a particular investigation.
+    arguments:
+    - name: investigation_id
+      description: >-
+        Find remediations recorded against this investigation. Correlation
+        relies on the marker that cmdzero-remediation-create writes into the
+        justification, so actions raised directly in the Command Zero
+        console will not be found. Cannot be combined with filter.
+      required: false
+    - name: subject_type
+      description: >-
+        Filter by subject type, for example
+        MICROSOFT_ENTRA_USER_PRINCIPAL_NAME. Ignored when investigation_id
+        or filter is supplied.
+      required: false
+    - name: limit
+      description: Maximum number of items to return (1-10000).
+      required: false
+      defaultValue: "50"
+    - name: filter
+      description: >-
+        OData-style filter expression to narrow results.
+        Supported fields are completedTime, createdTime, error,
+        justification, organizationId, status, subjectType, templateId,
+        updatedTime, createdBy/type, createdBy/id, createdBy/name,
+        updatedBy/type, updatedBy/id, and updatedBy/name.
+      required: false
+    - name: next_token
+      description: Pagination cursor from a previous response.
+      required: false
+    outputs:
+    - contextPath: CommandZero.Remediation.id
+      description: Remediation unique identifier.
+      type: String
+    - contextPath: CommandZero.Remediation.templateId
+      description: The template ID used.
+      type: String
+    - contextPath: CommandZero.Remediation.templateName
+      description: The template name at time of execution.
+      type: String
+    - contextPath: CommandZero.Remediation.subject
+      description: The target subject of the remediation.
+      type: Unknown
+    - contextPath: CommandZero.Remediation.status
+      description: Remediation execution status.
+      type: String
+    - contextPath: CommandZero.Remediation.justification
+      description: Justification provided when created.
+      type: String
+    - contextPath: CommandZero.Remediation.error
+      description: Error message if failed. Empty if no error.
+      type: String
+    - contextPath: CommandZero.Remediation.createdTime
+      description: When the remediation was created.
+      type: String
+    - contextPath: CommandZero.Remediation.consoleUrl
+      description: Direct link to the remediation in the console.
+      type: String
+    - contextPath: CommandZero.RemediationNextToken
+      description: Pagination cursor for the next page of results.
+      type: String
+
+  - name: cmdzero-investigation-template-list
+    description: >-
+      List investigation templates available to the organization. Use this to
+      find the template ID for a template-based investigation.
+    arguments:
+    - name: limit
+      description: Maximum number of items to return (1-10000).
+      required: false
+      defaultValue: "50"
+    - name: filter
+      description: >-
+        OData-style filter expression to narrow results.
+        Supported fields are createdTime, description, name, scenario,
+        sensitivity, severity, slidingDate, title, updatedTime,
+        createdBy/type, createdBy/id, createdBy/name, updatedBy/type,
+        updatedBy/id, and updatedBy/name.
+      required: false
+    - name: next_token
+      description: Pagination cursor from a previous response.
+      required: false
+    outputs:
+    - contextPath: CommandZero.InvestigationTemplate.id
+      description: Template unique identifier.
+      type: String
+    - contextPath: CommandZero.InvestigationTemplate.name
+      description: Template name.
+      type: String
+    - contextPath: CommandZero.InvestigationTemplate.title
+      description: Default title applied to investigations from this template.
+      type: String
+    - contextPath: CommandZero.InvestigationTemplate.description
+      description: What this template investigates.
+      type: String
+    - contextPath: CommandZero.InvestigationTemplate.scenario
+      description: The scenario this template covers.
+      type: String
+    - contextPath: CommandZero.InvestigationTemplate.leadTypes
+      description: >-
+        Lead types this template accepts. Supply matching leads to
+        cmdzero-investigation-create.
+      type: Unknown
+    - contextPath: CommandZero.InvestigationTemplate.severity
+      description: Default severity for investigations from this template.
+      type: String
+    - contextPath: CommandZero.InvestigationTemplateNextToken
+      description: Pagination cursor for the next page of results.
+      type: String
+
+  - name: cmdzero-catalog-type-list
+    description: >-
+      List types in the Command Zero catalog. Use this to find valid type
+      names when building an alert schema or a business context schema.
+    arguments:
+    - name: limit
+      description: Maximum number of items to return (1-10000).
+      required: false
+      defaultValue: "50"
+    - name: filter
+      description: >-
+        OData-style filter expression to narrow results.
+        Supported fields are name, description, isAlert, createdTime,
+        updatedTime, createdBy/type, createdBy/name, updatedBy/type, and
+        updatedBy/name.
+      required: false
+    - name: next_token
+      description: Pagination cursor from a previous response.
+      required: false
+    outputs:
+    - contextPath: CommandZero.CatalogType.id
+      description: Type unique identifier.
+      type: String
+    - contextPath: CommandZero.CatalogType.name
+      description: >-
+        The type name to use in schema annotations, such as EMAIL_ADDRESS.
+      type: String
+    - contextPath: CommandZero.CatalogType.description
+      description: What this type represents.
+      type: String
+    - contextPath: CommandZero.CatalogType.isAlert
+      description: True when this type identifies alert metadata.
+      type: Boolean
+    - contextPath: CommandZero.CatalogType.examples
+      description: Example values for this type.
+      type: Unknown
+    - contextPath: CommandZero.CatalogType.fields
+      description: Field structure for complex types.
+      type: Unknown
+    - contextPath: CommandZero.CatalogTypeNextToken
+      description: Pagination cursor for the next page of results.
+      type: String
+
+  - name: cmdzero-business-context-list
+    description: >-
+      List business context uploads for the organization. Returns metadata
+      such as name, status and record count, not the records themselves.
+    arguments:
+    - name: limit
+      description: Maximum number of items to return (1-10000).
+      required: false
+      defaultValue: "50"
+    - name: filter
+      description: >-
+        OData-style filter expression to narrow results.
+        Supported fields are createdTime, description, name, organizationId,
+        recordCount, status, subjectTypes, updatedTime, createdBy/type,
+        createdBy/id, createdBy/name, updatedBy/type, updatedBy/id, and
+        updatedBy/name. Records themselves are not searchable.
+      required: false
+    - name: next_token
+      description: Pagination cursor from a previous response.
+      required: false
+    outputs:
+    - contextPath: CommandZero.BusinessContextUpload.id
+      description: Upload unique identifier.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.name
+      description: Human-readable name for this upload.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.status
+      description: Processing status. One of processing, ready, or failed.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.recordCount
+      description: Number of records in this upload.
+      type: Number
+    - contextPath: CommandZero.BusinessContextUpload.subjectTypes
+      description: Subject types identified in this upload.
+      type: Unknown
+    - contextPath: CommandZero.BusinessContextUpload.updatedTime
+      description: When this upload was last updated.
+      type: String
+    - contextPath: CommandZero.BusinessContextUploadNextToken
+      description: Pagination cursor for the next page of results.
+      type: String
+
+  - name: cmdzero-business-context-get
+    description: Retrieve a single business context upload by ID.
+    arguments:
+    - name: upload_id
+      description: The business context upload ID to retrieve.
+      required: true
+    outputs:
+    - contextPath: CommandZero.BusinessContextUpload.id
+      description: Upload unique identifier.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.name
+      description: Human-readable name for this upload.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.description
+      description: Description of this upload.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.status
+      description: >-
+        Processing status. One of processing, ready, or failed. Context is
+        only applied to new investigations once the status is ready.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.recordCount
+      description: Number of records in this upload.
+      type: Number
+    - contextPath: CommandZero.BusinessContextUpload.subjectTypes
+      description: Subject types identified in this upload.
+      type: Unknown
+    - contextPath: CommandZero.BusinessContextUpload.error
+      description: Error message if processing failed. Empty otherwise.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.createdTime
+      description: When this upload was created.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.updatedTime
+      description: When this upload was last updated.
+      type: String
+
+  - name: cmdzero-business-context-upload
+    description: >-
+      Upload business context to enrich investigations with information about
+      subjects that cannot be discovered by querying IT systems. Processing is
+      asynchronous; use cmdzero-business-context-results to wait for it.
+    arguments:
+    - name: name
+      description: >-
+        A descriptive name identifying the source system and data type, such
+        as "HR User Directory" or "ServiceNow CMDB Servers".
+      required: true
+    - name: records
+      description: >-
+        JSON array of objects holding your context data. Each object should
+        contain at least one field that maps to a subject type in the
+        schema. Example -
+        [{"email":"user@company.com","department":"Engineering","vip":true}].
+      required: true
+    - name: schema
+      description: >-
+        JSON array of annotations mapping paths in your records to Command
+        Zero catalog types. At least two annotations are required, and at
+        least one must map to a subject type such as EMAIL_ADDRESS or
+        HOST_NAME. Example -
+        [{"path":"email","type":"EMAIL_ADDRESS"},{"path":"department","type":"TEXT"}].
+      required: true
+    - name: description
+      description: Optional description providing additional context.
+      required: false
+    outputs:
+    - contextPath: CommandZero.BusinessContextUpload.id
+      description: Upload unique identifier.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.name
+      description: Human-readable name for this upload.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.description
+      description: Description of this upload.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.status
+      description: >-
+        Processing status. One of processing, ready, or failed. Context is
+        only applied to new investigations once the status is ready.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.recordCount
+      description: Number of records in this upload.
+      type: Number
+    - contextPath: CommandZero.BusinessContextUpload.subjectTypes
+      description: Subject types identified in this upload.
+      type: Unknown
+    - contextPath: CommandZero.BusinessContextUpload.error
+      description: Error message if processing failed. Empty otherwise.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.createdTime
+      description: When this upload was created.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.updatedTime
+      description: When this upload was last updated.
+      type: String
+
+  - name: cmdzero-business-context-replace
+    description: >-
+      Replace an existing business context upload. This completely replaces
+      the previous records - it does not merge with existing data. Supply
+      records and schema together to replace the data, or only name and
+      description to update the metadata. The previous version stays active
+      until the new one finishes processing.
+    arguments:
+    - name: upload_id
+      description: The business context upload ID to replace.
+      required: true
+    - name: records
+      description: >-
+        JSON array of objects holding your context data. Each object should
+        contain at least one field that maps to a subject type in the
+        schema. Example -
+        [{"email":"user@company.com","department":"Engineering","vip":true}].
+      required: false
+    - name: schema
+      description: >-
+        JSON array of annotations mapping paths in your records to Command
+        Zero catalog types. At least two annotations are required, and at
+        least one must map to a subject type such as EMAIL_ADDRESS or
+        HOST_NAME. Example -
+        [{"path":"email","type":"EMAIL_ADDRESS"},{"path":"department","type":"TEXT"}].
+      required: false
+    - name: name
+      description: Updated name. The existing name is kept if omitted.
+      required: false
+    - name: description
+      description: >-
+        Updated description. The existing description is kept if omitted.
+      required: false
+    outputs:
+    - contextPath: CommandZero.BusinessContextUpload.id
+      description: Upload unique identifier.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.name
+      description: Human-readable name for this upload.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.description
+      description: Description of this upload.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.status
+      description: >-
+        Processing status. One of processing, ready, or failed. Context is
+        only applied to new investigations once the status is ready.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.recordCount
+      description: Number of records in this upload.
+      type: Number
+    - contextPath: CommandZero.BusinessContextUpload.subjectTypes
+      description: Subject types identified in this upload.
+      type: Unknown
+    - contextPath: CommandZero.BusinessContextUpload.error
+      description: Error message if processing failed. Empty otherwise.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.createdTime
+      description: When this upload was created.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.updatedTime
+      description: When this upload was last updated.
+      type: String
+
+  - name: cmdzero-business-context-delete
+    description: >-
+      Permanently delete a business context upload and all its records. This
+      cannot be undone. Investigations that already ran keep the context they
+      had; new investigations will not see it.
+    arguments:
+    - name: upload_id
+      description: The business context upload ID to delete.
+      required: true
+    outputs:
+    - contextPath: CommandZero.BusinessContextUpload.id
+      description: The deleted upload ID.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.deleted
+      description: True when the upload was deleted.
+      type: Boolean
+
+  - name: cmdzero-business-context-results
+    description: >-
+      Wait for a business context upload to finish processing. Context is only
+      applied to new investigations once the upload is ready, so a sync that
+      reports success on upload alone reports too early. Large uploads may
+      take several minutes.
+    polling: true
+    arguments:
+    - name: upload_id
+      description: >-
+        The business context upload ID to wait on.
+        Map from CommandZero.BusinessContextUpload.id.
+      required: true
+    - name: interval_in_seconds
+      description: Seconds between polls.
+      required: false
+      defaultValue: "30"
+    - name: timeout_in_seconds
+      description: Seconds before polling gives up.
+      required: false
+      defaultValue: "1800"
+    outputs:
+    - contextPath: CommandZero.BusinessContextUpload.id
+      description: Upload unique identifier.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.name
+      description: Human-readable name for this upload.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.description
+      description: Description of this upload.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.status
+      description: >-
+        Processing status. One of processing, ready, or failed. Context is
+        only applied to new investigations once the status is ready.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.recordCount
+      description: Number of records in this upload.
+      type: Number
+    - contextPath: CommandZero.BusinessContextUpload.subjectTypes
+      description: Subject types identified in this upload.
+      type: Unknown
+    - contextPath: CommandZero.BusinessContextUpload.error
+      description: Error message if processing failed. Empty otherwise.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.createdTime
+      description: When this upload was created.
+      type: String
+    - contextPath: CommandZero.BusinessContextUpload.updatedTime
+      description: When this upload was last updated.
+      type: String
+
+  - name: cmdzero-investigation-create
+    description: >-
+      Create a Command Zero investigation from alert data or a template.
+      Alert submissions take one of three forms:
+      (1) alert_type + alert_data, where Command Zero resolves the schema from
+      the alert type - title and description are both required;
+      (2) alert_type + alert_data + alert_schema as a JSON array of
+      annotations, where you map your own data shape;
+      (3) alert_data + alert_schema as a known catalog type string, where the
+      payload must already match that catalog entry - alert_type must not be
+      set. Alternatively use template_id with leads.
+      Use cmdzero-investigation-results to wait for the verdict.
+    arguments:
+    - name: alert_data
+      description: >-
+        JSON object containing the alert data to investigate.
+        Required when not using template_id.
+      required: false
+    - name: alert_type
+      description: >-
+        The kind of alert this is, for example EmailMalwareDetected.
+        Required when alert_schema is omitted, and when alert_schema is a
+        JSON array of annotations. Must NOT be set when alert_schema is a
+        catalog type string, because the catalog entry already defines it.
+      required: false
+    - name: alert_schema
+      description: >-
+        Either a JSON array of path/type annotations describing where the
+        values are in your own data
+        (e.g. [{"path":"sender.email","type":"EMAIL_ADDRESS"}]),
+        or a known catalog type string
+        (e.g. RECORDED_FUTURE_PLAYBOOK_ALERT).
+        Use the catalog type only when the payload still matches that
+        entry's expected shape; if the data has been reshaped on its way
+        here, supply annotations instead. Use cmdzero-catalog-type-list to
+        find valid type names.
+      required: false
+    - name: description
+      description: >-
+        Detailed description of the investigation. Required when submitting
+        alert_type and alert_data without an alert_schema. Otherwise
+        defaults to the alert description.
+      required: false
+    - name: category
+      description: >-
+        Category of the investigation, such as Phishing, Malware, or
+        Credential Compromise.
+      required: false
+    - name: tags
+      description: >-
+        JSON array of tags to apply to the investigation.
+        Example - ["urgent","vip-user"].
+      required: false
+    - name: nosettle
+      description: >-
+        Prevents automated report generation and settlement notifications
+        when the investigation completes. Use when exercising the
+        integration rather than running a real investigation.
+      required: false
+      auto: PREDEFINED
+      predefined:
+      - "true"
+      - "false"
+      defaultValue: "false"
+    - name: template_id
+      description: >-
+        Investigation template ID for template-based investigations.
+        Use instead of alert_data and alert_schema.
+      required: false
+    - name: leads
+      description: >-
+        JSON array of lead objects when using template_id.
+        Example - [{"type":"EMAIL_ADDRESS","value":"user@company.com"}].
+      required: false
+    - name: title
+      description: Investigation title. Optional override.
+      required: false
+    - name: start_time
+      description: ISO 8601 start time for template investigations.
+      required: false
+    - name: end_time
+      description: ISO 8601 end time for template investigations.
+      required: false
+    - name: postback_url
+      description: URL to receive notification when investigation completes.
+      required: false
+    - name: postback_token
+      description: Secret token for postback verification.
+      required: false
+    outputs:
+    - contextPath: CommandZero.Investigation.id
+      description: Investigation unique identifier.
+      type: String
+    - contextPath: CommandZero.Investigation.action
+      description: >-
+        Whether a new investigation was started or the alert was merged
+        into an existing one. One of created or merged.
+      type: String
+    - contextPath: CommandZero.Investigation.title
+      description: Investigation title.
+      type: String
+    - contextPath: CommandZero.Investigation.status
+      description: Investigation status.
+      type: String
+    - contextPath: CommandZero.Investigation.severity
+      description: Investigation severity.
+      type: String
+    - contextPath: CommandZero.Investigation.category
+      description: Investigation category.
+      type: String
+    - contextPath: CommandZero.Investigation.completed
+      description: True when verdict is ready.
+      type: Boolean
+    - contextPath: CommandZero.Investigation.consoleUrl
+      description: Direct link to the investigation in the console.
+      type: String
+    - contextPath: CommandZero.Investigation.investigationUrl
+      description: API URL to retrieve investigation status and results.
+      type: String
+    - contextPath: CommandZero.Investigation.organizationId
+      description: Organization that owns this investigation.
+      type: String
+    - contextPath: CommandZero.Investigation.createdTime
+      description: When the investigation was created.
+      type: String
+
+fromversion: 6.10.0
+tests:
+- Command Zero - Test

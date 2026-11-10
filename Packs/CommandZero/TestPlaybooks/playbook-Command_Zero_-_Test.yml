@@ -1,0 +1,326 @@
+id: Command Zero - Test
+version: -1
+name: Command Zero - Test
+description: |-
+  Certification test playbook for the Command Zero integration.
+
+  Verifies API key authentication, endpoint reachability, and response parsing
+  against a live tenant without creating an investigation or executing any
+  response action, so the test is safe to run repeatedly in CI.
+
+  Organizations are asserted to be non-empty, since a valid Application-role API
+  key always belongs to at least one organization. The list commands are run as
+  smoke tests: they fail the playbook if the request errors or the response
+  cannot be parsed.
+starttaskid: "0"
+tasks:
+  "0":
+    id: "0"
+    taskid: 9c3d2e10-0000-4000-a000-000000000000
+    type: start
+    task:
+      id: 9c3d2e10-0000-4000-a000-000000000000
+      version: -1
+      name: ""
+      iscommand: false
+      brand: ""
+      description: ''
+    nexttasks:
+      '#none#':
+        - "1"
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 50
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "1":
+    id: "1"
+    taskid: 9c3d2e10-0000-4000-a000-000000000001
+    type: regular
+    task:
+      id: 9c3d2e10-0000-4000-a000-000000000001
+      version: -1
+      name: Clear context
+      description: Starts the test from a clean context.
+      scriptName: DeleteContext
+      type: regular
+      iscommand: false
+      brand: ""
+    nexttasks:
+      '#none#':
+        - "2"
+    scriptarguments:
+      all:
+        simple: "yes"
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 195
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "2":
+    id: "2"
+    taskid: 9c3d2e10-0000-4000-a000-000000000002
+    type: regular
+    task:
+      id: 9c3d2e10-0000-4000-a000-000000000002
+      version: -1
+      name: List organizations
+      description: |-
+        Exercises authentication and the organizations endpoint. A failure here
+        means the API key is invalid, expired, or unreachable.
+      script: CommandZero|||cmdzero-organization-list
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "3"
+    scriptarguments:
+      limit:
+        simple: "10"
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 370
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "3":
+    id: "3"
+    taskid: 9c3d2e10-0000-4000-a000-000000000003
+    type: condition
+    task:
+      id: 9c3d2e10-0000-4000-a000-000000000003
+      version: -1
+      name: Was an organization returned?
+      description: |-
+        A valid Application-role API key always belongs to at least one
+        organization, so an empty result means the response was not parsed
+        correctly or the key has no grants.
+      type: condition
+      iscommand: false
+      brand: ""
+    nexttasks:
+      '#default#':
+        - "6"
+      "Found":
+        - "4"
+    separatecontext: false
+    conditions:
+      - label: "Found"
+        condition:
+          - - operator: isNotEmpty
+              left:
+                value:
+                  complex:
+                    root: CommandZero.Organization
+                    accessor: id
+                iscontext: true
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 450,
+          "y": 545
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "4":
+    id: "4"
+    taskid: 9c3d2e10-0000-4000-a000-000000000004
+    type: regular
+    task:
+      id: 9c3d2e10-0000-4000-a000-000000000004
+      version: -1
+      name: List investigations
+      description: |-
+        Smoke test for the investigations endpoint and its pagination envelope.
+        An empty tenant is a valid result; a request error is not.
+      script: CommandZero|||cmdzero-investigation-list
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "5"
+    scriptarguments:
+      limit:
+        simple: "1"
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 240,
+          "y": 720
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "5":
+    id: "5"
+    taskid: 9c3d2e10-0000-4000-a000-000000000005
+    type: regular
+    task:
+      id: 9c3d2e10-0000-4000-a000-000000000005
+      version: -1
+      name: List remediation templates
+      description: |-
+        Smoke test for the remediation templates endpoint. No remediation is
+        executed.
+      script: CommandZero|||cmdzero-remediation-template-list
+      type: regular
+      iscommand: true
+      brand: CommandZero
+    nexttasks:
+      '#none#':
+        - "7"
+    scriptarguments:
+      limit:
+        simple: "1"
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 240,
+          "y": 895
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "6":
+    id: "6"
+    taskid: 9c3d2e10-0000-4000-a000-000000000006
+    type: regular
+    task:
+      id: 9c3d2e10-0000-4000-a000-000000000006
+      version: -1
+      name: Fail the test
+      description: No organization was returned, so the integration is not working.
+      scriptName: PrintErrorEntry
+      type: regular
+      iscommand: false
+      brand: ""
+    scriptarguments:
+      message:
+        simple: |-
+          Command Zero test failed: cmdzero-organization-list returned no
+          organizations. Check the API key, its Application role grants, and
+          the configured Base URL.
+    reputationcalc: 0
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 690,
+          "y": 720
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+  "7":
+    id: "7"
+    taskid: 9c3d2e10-0000-4000-a000-000000000007
+    type: title
+    task:
+      id: 9c3d2e10-0000-4000-a000-000000000007
+      version: -1
+      name: Test complete
+      type: title
+      iscommand: false
+      brand: ""
+      description: ''
+    separatecontext: false
+    continueonerrortype: ""
+    view: |-
+      {
+        "position": {
+          "x": 240,
+          "y": 1070
+        }
+      }
+    note: false
+    timertriggers: []
+    ignoreworker: false
+    skipunavailable: false
+    quietmode: 0
+    isoversize: false
+    isautoswitchedtoquietmode: false
+view: |-
+  {
+    "linkLabelsPosition": {
+      "3_4_Found": 0.4,
+      "3_6_#default#": 0.4
+    },
+    "paper": {
+      "dimensions": {
+        "height": 1085,
+        "width": 830,
+        "x": 240,
+        "y": 50
+      }
+    }
+  }
+inputs: []
+outputs: []
+fromversion: 6.10.0
+marketplaces:
+  - xsoar

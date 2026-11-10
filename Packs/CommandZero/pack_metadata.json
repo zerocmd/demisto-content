@@ -1,0 +1,14 @@
+{
+  "name": "CommandZero",
+  "description": "Automated security investigation and response via Command Zero.",
+  "support": "partner",
+  "currentVersion": "1.0.0",
+  "author": "Command Zero",
+  "url": "https://cmdzero.io",
+  "email": "support@cmdzero.io",
+  "categories": ["Data Enrichment & Threat Intelligence", "Analytics & SIEM"],
+  "tags": ["Incident Response", "Security Analytics", "Alerts"],
+  "useCases": ["Incident Response"],
+  "keywords": ["cmdzero", "investigate", "remediate", "alert", "investigation", "remediation", "SOAR"],
+  "marketplaces": ["xsoar"]
+}

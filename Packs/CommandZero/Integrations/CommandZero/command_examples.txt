@@ -1,0 +1,19 @@
+!cmdzero-organization-list limit=10
+!cmdzero-investigation-template-list limit=5
+!cmdzero-catalog-type-list limit=5
+!cmdzero-remediation-template-list limit=5
+!cmdzero-investigation-create nosettle=true alert_type=EmailMalwareDetected alert_data=`{"alert_title":"Malicious file attached to email","seen":"2026-01-13T15:00:37Z","sender":{"email":"attacker@example.com"},"file":{"sha256":"275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f"}}` alert_schema=`[{"path":"alert_title","type":"ALERT_TITLE"},{"path":"seen","type":"ALERT_TIME"},{"path":"sender.email","type":"EMAIL_ADDRESS"},{"path":"file.sha256","type":"SHA_256"}]` title="Malicious file detected in email"
+!cmdzero-investigation-list limit=5
+!cmdzero-investigation-get investigation_id=REPLACE_WITH_INVESTIGATION_ID
+!cmdzero-investigation-results investigation_id=REPLACE_WITH_INVESTIGATION_ID interval_in_seconds=30 timeout_in_seconds=900 post_note=true response_disposition=investigate-only
+!cmdzero-investigation-note investigation_id=REPLACE_WITH_INVESTIGATION_ID response_disposition=investigate-only
+!cmdzero-remediation-list limit=5
+!cmdzero-remediation-create template_id=REPLACE_WITH_NOTIFY_ONLY_TEMPLATE_ID subject_type=REPLACE_WITH_MATCHING_SUBJECT_TYPE subject_value=REPLACE_WITH_TEST_SUBJECT justification="Integration capture run" investigation_id=REPLACE_WITH_INVESTIGATION_ID
+!cmdzero-remediation-results remediation_id=REPLACE_WITH_REMEDIATION_ID
+!cmdzero-remediation-list investigation_id=REPLACE_WITH_INVESTIGATION_ID
+!cmdzero-business-context-upload name="XSOAR Integration Capture" records=`[{"email":"capture-test@example.com","department":"Testing"}]` schema=`[{"path":"email","type":"EMAIL_ADDRESS"},{"path":"department","type":"TEXT"}]` description="Temporary upload for documentation capture"
+!cmdzero-business-context-results upload_id=REPLACE_WITH_UPLOAD_ID
+!cmdzero-business-context-list limit=5 filter="name eq 'XSOAR Integration Capture'"
+!cmdzero-business-context-get upload_id=REPLACE_WITH_UPLOAD_ID
+!cmdzero-business-context-replace upload_id=REPLACE_WITH_UPLOAD_ID description="Replaced during capture"
+!cmdzero-business-context-delete upload_id=REPLACE_WITH_UPLOAD_ID
